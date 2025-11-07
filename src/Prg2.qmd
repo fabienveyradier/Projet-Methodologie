@@ -27,10 +27,10 @@ print("✅ Installation terminée.")
 
 # ⚠️ ATTENTION : Si la commande 'apt' ne fonctionne pas, il se peut que votre conteneur utilise 'conda'.
 # Si c'est le cas, remplacez les lignes ci-dessous par: 
-!conda install -y poppler
+#!conda install -y poppler
 
-#!apt update
-#!apt install poppler-utils -y
+sudo apt update
+sudo apt install poppler-utils -y
 
 print("✅ Poppler-utils (dépendance système) installé.")
 ```
@@ -95,15 +95,24 @@ except Exception as e:
 
 ## Conversion en images des pages
 
-```{python}
-from pdf2image import convert_from_path # On importe ici pour s'assurer que c'est disponible
-# Utilisation du chemin complet (chemin_complet) pour la conversion
+```{python convert-images}
+## Conversion en images des pages
+
+from pdf2image import convert_from_path 
+
+# Note : L'argument poppler_path a été retiré. pdf2image recherche 'pdftoppm' 
+# directement dans le PATH du système après l'installation via sudo apt.
+
 try:
     # pages_images est une liste d'objets PIL.Image
-    pages_images = convert_from_path(chemin_complet)
-    print(f"🖼️ {len(pages_images)} pages converties en objets Image.")
+    pages_images = convert_from_path(
+        chemin_complet
+        # poppler_path n'est plus nécessaire ici
+    )
+    print(f"🖼️ {len(pages_images)} pages converties en objets Image avec succès.")
 except Exception as e:
-    print(f"❌ ERREUR lors de la conversion en images (vérifiez poppler-utils) : {e}")
+    # Si cette erreur se produit, cela signifie que poppler a été désinstallé ou n'est plus dans le PATH.
+    print(f"❌ ERREUR lors de la conversion en images. La dépendance système Poppler est manquante. Erreur: {e}")
 ```
 
 
