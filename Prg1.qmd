@@ -1,0 +1,36 @@
+---
+title: "Test librairie fichier PDF"
+format: html
+---
+
+## 🔧 Chargement des bibliothèques
+
+```{python}
+# 1. Installation des dépendances
+# 'Accelerate' et 'bitsandbytes' pour optimiser l'utilisation du GPU
+# 'pypdf' pour la manipulation des fichiers PDF
+# 'Pillow' pour le traitement d'images
+
+!pip install -q transformers accelerate bitsandbytes torch pypdf Pillow
+
+# 'pdf2image' sert à convertir des pages PDF en images
+!pip install -q pdf2image
+
+print("✅ Installation terminée.")
+```
+
+## 🔧 Importation des bibliothèques
+
+```{python}
+# 2. Importation
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from pypdf import PdfReader
+from pdf2image import convert_from_path
+from PIL import Image
+import torch
+
+print("📦 Bibliothèques importées avec succès.")
+```
+
+## 🔧 Importation des bibliothèques
