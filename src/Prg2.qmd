@@ -1,0 +1,197 @@
+---
+title: "Test librairie fichier PDF"
+format: html
+---
+
+## 🔧 Chargement des bibliothèques
+
+```{python}
+# 1. Installation des dépendances
+# 'Accelerate' et 'bitsandbytes' pour optimiser l'utilisation du GPU
+# 'pypdf' pour la manipulation des fichiers PDF
+# 'Pillow' pour le traitement d'images
+
+!pip install -q transformers accelerate bitsandbytes torch pypdf Pillow
+
+# 'pdf2image' sert à convertir des pages PDF en images
+!pip install -q pdf2image
+
+print("✅ Installation terminée.")
+```
+
+## 🔧 Installation de la dépendance système (Poppler)
+
+```{python install-poppler, eval=FALSE}
+# eval=FALSE : Ne pas exécuter à chaque fois. Décommenter et exécuter UNE SEULE FOIS.
+# Installe les outils Poppler (nécessaires à pdf2image) sur la machine Linux du conteneur.
+
+# ⚠️ ATTENTION : Si la commande 'apt' ne fonctionne pas, il se peut que votre conteneur utilise 'conda'.
+# Si c'est le cas, remplacez les lignes ci-dessous par: 
+!conda install -y poppler
+
+#!apt update
+#!apt install poppler-utils -y
+
+print("✅ Poppler-utils (dépendance système) installé.")
+```
+
+## 🔧 Importation des bibliothèques
+
+```{python import-libs}
+# 2. Importation
+
+
+import os
+import json # NOUVEAU : pour manipuler les données JSON
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from pypdf import PdfReader
+from pdf2image import convert_from_path
+from PIL import Image
+import torch
+
+print("📦 Bibliothèques importées avec succès.")
+```
+
+## 🔧 Chargement du fichier pdf
+
+```{python load-file}
+import os
+from pypdf import PdfReader # <-- AJOUTER CETTE LIGNE
+
+# --- CHANGEMENT DE RÉPERTOIRE DE TRAVAIL ---
+# Définir le chemin cible : la racine du projet
+racine_projet = "/home/onyxia/work/Projet-Methodologie/" 
+
+# Changer le répertoire de travail vers la racine du projet
+try:
+    os.chdir(racine_projet)
+    print(f"✅ Nouveau répertoire de travail défini sur : {os.getcwd()}")
+except Exception as e:
+    print(f"❌ ERREUR: Impossible de changer de répertoire vers {racine_projet}. Vérifiez le chemin. Erreur: {e}")
+    # Nous continuons quand même, mais le chemin relatif pourrait échouer
+    
+# --- Configuration du chemin ---
+fichier_pdf = "INSEE-etude118.pdf"
+repertoire_entree = "input_files"
+# Le chemin complet est maintenant calculé à partir de la racine
+chemin_complet = os.path.join(repertoire_entree, fichier_pdf)
+
+# Vérification de l'existence du fichier
+if not os.path.exists(chemin_complet):
+    # La vérification se fait maintenant à partir de /home/onyxia/work/Projet-Methodologie/
+    print(f"❌ ERREUR FATALE: Le fichier est introuvable à l'emplacement '{chemin_complet}'.")
+    raise FileNotFoundError("Le fichier PDF est manquant ou le chemin est incorrect. Assurez-vous que le dossier 'input_files' existe à la racine du nouveau répertoire de travail.")
+else:
+    print(f"✅ Chemin de fichier vérifié : {chemin_complet}")
+
+# --- Lecture du texte (pypdf) ---
+try:
+    reader = PdfReader(chemin_complet)
+    num_pages = len(reader.pages)
+    print(f"📄 Document lu. Nombre de pages : {num_pages}")
+except Exception as e:
+    print(f"❌ ERREUR inattendue lors de la lecture du PDF : {e}")
+```
+
+## Conversion en images des pages
+
+```{python}
+from pdf2image import convert_from_path # On importe ici pour s'assurer que c'est disponible
+# Utilisation du chemin complet (chemin_complet) pour la conversion
+try:
+    # pages_images est une liste d'objets PIL.Image
+    pages_images = convert_from_path(chemin_complet)
+    print(f"🖼️ {len(pages_images)} pages converties en objets Image.")
+except Exception as e:
+    print(f"❌ ERREUR lors de la conversion en images (vérifiez poppler-utils) : {e}")
+```
+
+
+
+## 🔧 Analyse du fichier pdf
+
+## 💡 Note : La simulation de l'analyse par LLM est utilisée ici. 
+## En réalité, le code réel ferait appel à AutoModelForCausalLM.generate.
+
+```{python analyze}
+# --- 1. Extraction du texte ---
+texte_integral = ""
+try:
+    # On réutilise le lecteur du bloc précédent, sinon il faudrait le re-créer
+    # Assurez-vous d'exécuter tous les blocs séquentiellement.
+    for page in reader.pages:
+        texte_integral += page.extract_text()
+    
+    print(f"Extraction du texte réussie. {len(texte_integral)} caractères extraits.")
+
+except NameError:
+    # Gestion d'erreur au cas où 'reader' ne serait pas défini (si le bloc 2 n'a pas été exécuté)
+    print("❌ ERREUR: Le lecteur de PDF (reader) n'est pas défini. Exécutez le bloc 2 d'abord.")
+    raise
+
+# --- 2. Initialisation du Modèle VLM (Document Question Answering) ---
+
+# Modèle VLM pour l'analyse de documents
+MODEL_VLM_NAME = "impira/layoutlm-document-qa"
+
+try:
+    # Tente d'utiliser le GPU si disponible
+    device = 0 if torch.cuda.is_available() else -1 
+    
+    # Le pipeline gère le tokenizer, le modèle, et le post-traitement.
+    vlm_qa_pipeline = pipeline(
+        "document-question-answering",
+        model=MODEL_VLM_NAME,
+        device=device
+    )
+    print(f"✅ Modèle VLM '{MODEL_VLM_NAME}' chargé sur le device: {'GPU' if device == 0 else 'CPU'}.")
+
+except Exception as e:
+    print(f"❌ ERREUR lors du chargement du modèle VLM. Vérifiez l'installation et la mémoire : {e}")
+    # Le code ci-dessous ne pourra pas s'exécuter si le modèle ne charge pas.
+    raise
+```
+
+## Analyse VLM
+
+
+```{python analyze-and-export}
+# --- 3. Structuration de la Sortie JSON ---
+# La variable resultat_analyse_vlm doit être définie ici ou réutilisée du bloc précédent
+
+# Création du dictionnaire JSON avec les résultats de l'analyse VLM
+resultat_analyse_vlm = {
+    "source_fichier": fichier_pdf,
+    "chemin_relatif_entree": os.path.join(repertoire_entree, fichier_pdf),
+    "nombre_pages": num_pages,
+    "analyse_vlm": {
+        # La variable 'reponse_titre' vient du bloc 'analyze' et contient le résultat du VLM
+        "titre_etude_vlm": reponse_titre, 
+        "resultats_chiffres": "Nécessite une boucle sur toutes les pages pour extraire les chiffres (à coder).",
+        "statut_analyse": "VLM exécuté sur la première page."
+    },
+    "full_text_sample": reader.pages[0].extract_text()[:500] + "..."
+}
+
+# --- 4. Export de l'analyse ---
+
+# Définition des chemins de sortie
+repertoire_sortie = "output_files"
+nom_fichier_json = fichier_pdf.replace(".pdf", "_analyse.json") # Renommé pour plus de clarté
+chemin_sortie = os.path.join(repertoire_sortie, nom_fichier_json)
+
+# Création du répertoire de sortie s'il n'existe pas
+os.makedirs(repertoire_sortie, exist_ok=True)
+print(f"Création/vérification du répertoire de sortie : {repertoire_sortie}/")
+
+# --- 5. Écriture du fichier JSON ---
+try:
+    with open(chemin_sortie, 'w', encoding='utf-8') as f:
+        # Utilisation de la variable VLM corrigée: resultat_analyse_vlm
+        json.dump(resultat_analyse_vlm, f, ensure_ascii=False, indent=4) 
+        
+    print(f"✅ Exportation JSON VLM réussie. Le fichier a été déposé à : {chemin_sortie}")
+
+except Exception as e:
+    print(f"❌ ERREUR lors de l'écriture du fichier JSON : {e}")
+```

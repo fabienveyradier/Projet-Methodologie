@@ -1,0 +1,138 @@
+---
+title: "Test librairie fichier PDF"
+format: html
+---
+
+## 🔧 Chargement des bibliothèques
+
+```{python}
+# 1. Installation des dépendances
+# 'Accelerate' et 'bitsandbytes' pour optimiser l'utilisation du GPU
+# 'pypdf' pour la manipulation des fichiers PDF
+# 'Pillow' pour le traitement d'images
+
+!pip install -q transformers accelerate bitsandbytes torch pypdf Pillow
+
+# 'pdf2image' sert à convertir des pages PDF en images
+!pip install -q pdf2image
+
+print("✅ Installation terminée.")
+```
+
+## 🔧 Importation des bibliothèques
+
+```{python import-libs}
+# 2. Importation
+
+
+import os
+import json # NOUVEAU : pour manipuler les données JSON
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from pypdf import PdfReader
+from pdf2image import convert_from_path
+from PIL import Image
+import torch
+
+print("📦 Bibliothèques importées avec succès.")
+```
+
+## 🔧 Chargement du fichier pdf
+
+```{python load-file}
+import os
+from pypdf import PdfReader # <-- AJOUTER CETTE LIGNE
+
+# --- CHANGEMENT DE RÉPERTOIRE DE TRAVAIL ---
+# Définir le chemin cible : la racine du projet
+racine_projet = "/home/onyxia/work/Projet-Methodologie/" 
+
+# Changer le répertoire de travail vers la racine du projet
+try:
+    os.chdir(racine_projet)
+    print(f"✅ Nouveau répertoire de travail défini sur : {os.getcwd()}")
+except Exception as e:
+    print(f"❌ ERREUR: Impossible de changer de répertoire vers {racine_projet}. Vérifiez le chemin. Erreur: {e}")
+    # Nous continuons quand même, mais le chemin relatif pourrait échouer
+    
+# --- Configuration du chemin ---
+fichier_pdf = "INSEE-etude118.pdf"
+repertoire_entree = "input_files"
+# Le chemin complet est maintenant calculé à partir de la racine
+chemin_complet = os.path.join(repertoire_entree, fichier_pdf)
+
+# Vérification de l'existence du fichier
+if not os.path.exists(chemin_complet):
+    # La vérification se fait maintenant à partir de /home/onyxia/work/Projet-Methodologie/
+    print(f"❌ ERREUR FATALE: Le fichier est introuvable à l'emplacement '{chemin_complet}'.")
+    raise FileNotFoundError("Le fichier PDF est manquant ou le chemin est incorrect. Assurez-vous que le dossier 'input_files' existe à la racine du nouveau répertoire de travail.")
+else:
+    print(f"✅ Chemin de fichier vérifié : {chemin_complet}")
+
+# --- Lecture du texte (pypdf) ---
+try:
+    reader = PdfReader(chemin_complet)
+    num_pages = len(reader.pages)
+    print(f"📄 Document lu. Nombre de pages : {num_pages}")
+except Exception as e:
+    print(f"❌ ERREUR inattendue lors de la lecture du PDF : {e}")
+```
+
+## 🔧 Analyse du fichier pdf
+
+## 💡 Note : La simulation de l'analyse par LLM est utilisée ici. 
+## En réalité, le code réel ferait appel à AutoModelForCausalLM.generate.
+
+```{python analyze-and-export}
+# --- 1. Extraction du texte ---
+texte_integral = ""
+try:
+    # On réutilise le lecteur du bloc précédent, sinon il faudrait le re-créer
+    # Assurez-vous d'exécuter tous les blocs séquentiellement.
+    for page in reader.pages:
+        texte_integral += page.extract_text()
+    
+    print(f"Extraction du texte réussie. {len(texte_integral)} caractères extraits.")
+
+except NameError:
+    # Gestion d'erreur au cas où 'reader' ne serait pas défini (si le bloc 2 n'a pas été exécuté)
+    print("❌ ERREUR: Le lecteur de PDF (reader) n'est pas défini. Exécutez le bloc 2 d'abord.")
+    raise
+
+# --- 2. Simulation de l'analyse LLM ---
+
+# Le Modèle de Langage (LLM) simulerait ici l'analyse du texte_integral.
+# Simuler une sortie JSON structurée basée sur l'étude INSEE.
+resultat_analyse_llm = {
+    "source_fichier": fichier_pdf,
+    "date_analyse": os.path.getmtime(chemin_complet), # Date de modification du fichier
+    "pages_analysees": num_pages,
+    "resume_simule": "L'étude INSEE analyse la croissance du PIB au second trimestre, mettant en évidence une légère accélération des investissements privés et une décélération de la consommation des ménages due à l'inflation.",
+    "chiffres_cles": {
+        "croissance_pib_q2": "0.5%",
+        "investissements_prives": "+1.2%",
+        "inflation_annuelle": "5.8%"
+    }
+}
+print("✨ Analyse simulée effectuée.")
+
+# --- 3. Configuration de la Sortie ---
+
+# 3a. Définition des chemins
+repertoire_sortie = "output_files"
+nom_fichier_json = fichier_pdf.replace(".pdf", "_analyse_P1.json")
+chemin_sortie = os.path.join(repertoire_sortie, nom_fichier_json)
+
+# 3b. Création du répertoire de sortie s'il n'existe pas
+os.makedirs(repertoire_sortie, exist_ok=True)
+print(f"Création/vérification du répertoire de sortie : {repertoire_sortie}/")
+
+# --- 4. Écriture du fichier JSON ---
+try:
+    with open(chemin_sortie, 'w', encoding='utf-8') as f:
+        # Écriture du dictionnaire Python sous forme de JSON formaté
+        json.dump(resultat_analyse_llm, f, ensure_ascii=False, indent=4)
+        
+    print(f"✅ Exportation JSON réussie. Le fichier a été déposé à : {chemin_sortie}")
+
+except Exception as e:
+    print(f"❌ ERREUR lors de l'écriture du fichier JSON : {e}")
